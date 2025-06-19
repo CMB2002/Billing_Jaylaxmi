@@ -1,9 +1,10 @@
 import customtkinter as ctk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from ui_windows import ConfirmDialog, EditFormDialog
 from frames.customer_profile import CustomerProfileFrame
 from utils.logger import log
 from utils.helpers import refresh_all
+import csv
 
 class HoverTreeview(ttk.Treeview):
     def __init__(self, master=None, **kw):
@@ -28,13 +29,16 @@ class CustomerFrame(ctk.CTkFrame):
         self.app = app
         self.set_status = set_status or (lambda msg: None)
         self.search_term = ""
+        self.filter_owing = ctk.BooleanVar(value=False)
+        self.displayed_rows = []  # For export
 
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(4, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
         self._build_form()
-        self._build_search()
+        self._build_search_and_filter()
         self._build_table()
+        self._build_export_button()
         self.refresh_customers()
 
     def _build_form(self):
@@ -54,13 +58,25 @@ class CustomerFrame(ctk.CTkFrame):
         self.name_entry.bind("<Return>", lambda e: self.phone_entry.focus_set())
         self.phone_entry.bind("<Return>", lambda e: add_btn.invoke())
 
-    def _build_search(self):
+    def _build_search_and_filter(self):
         sf = ctk.CTkFrame(self)
         sf.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 1))
         sf.grid_columnconfigure(0, weight=1)
+        sf.grid_columnconfigure(1, weight=0)
+
         self.search_entry = ctk.CTkEntry(sf, placeholder_text="Search customers...")
-        self.search_entry.grid(row=0, column=0, sticky="ew")
+        self.search_entry.grid(row=0, column=0, sticky="ew", padx=(0,5))
         self.search_entry.bind("<KeyRelease>", self._on_search)
+
+        filter_btn = ctk.CTkCheckBox(
+            sf,
+            text="Show only owing",
+            variable=self.filter_owing,
+            command=self.refresh_customers,
+            width=30,
+            height=26
+        )
+        filter_btn.grid(row=0, column=1, sticky="e", padx=(2,0))
 
     def _build_table(self):
         frame = ctk.CTkFrame(self)
@@ -68,13 +84,14 @@ class CustomerFrame(ctk.CTkFrame):
         frame.grid_rowconfigure(0, weight=1)
         frame.grid_columnconfigure(0, weight=1)
 
-        columns = ("name", "phone", "invoices", "spent", "profile", "edit", "delete")
+        columns = ("name", "phone", "invoices", "spent", "owed", "profile", "edit", "delete")
         self.tree = HoverTreeview(frame, columns=columns, show="headings", selectmode="browse")
 
         self.tree.heading("name", text="Customer Name")
         self.tree.heading("phone", text="Phone")
         self.tree.heading("invoices", text="Invoices")
         self.tree.heading("spent", text="Total Spent")
+        self.tree.heading("owed", text="Owed")
         self.tree.heading("profile", text="👤")
         self.tree.heading("edit", text="✏️")
         self.tree.heading("delete", text="🗑️")
@@ -83,6 +100,7 @@ class CustomerFrame(ctk.CTkFrame):
         self.tree.column("phone", width=140, anchor="center")
         self.tree.column("invoices", width=80, anchor="center")
         self.tree.column("spent", width=100, anchor="center")
+        self.tree.column("owed", width=90, anchor="center")
         self.tree.column("profile", width=50, anchor="center")
         self.tree.column("edit", width=40, anchor="center")
         self.tree.column("delete", width=40, anchor="center")
@@ -107,6 +125,12 @@ class CustomerFrame(ctk.CTkFrame):
         self.tree.bind("<Motion>", self._on_tree_motion)
         self.tree.bind("<Leave>", lambda e: self.tree.config(cursor=""))
 
+    def _build_export_button(self):
+        exp_frame = ctk.CTkFrame(self)
+        exp_frame.grid(row=3, column=0, sticky="ew", padx=20, pady=(0, 1))
+        export_btn = ctk.CTkButton(exp_frame, text="Export CSV", command=self._export_csv)
+        export_btn.pack(side="right", padx=2)
+
     def _on_tree_motion(self, event):
         region = self.tree.identify("region", event.x, event.y)
         if region == "heading":
@@ -114,8 +138,8 @@ class CustomerFrame(ctk.CTkFrame):
             return
         if region == "cell":
             col = self.tree.identify_column(event.x)
-            # Only change cursor for profile, edit, delete columns (#5, #6, #7)
-            if col in ("#5", "#6", "#7"):
+            # Only change cursor for profile, edit, delete columns
+            if col in ("#6", "#7", "#8"):
                 self.tree.config(cursor="hand2")
             else:
                 self.tree.config(cursor="")
@@ -154,32 +178,38 @@ class CustomerFrame(ctk.CTkFrame):
     def refresh_customers(self):
         for i in self.tree.get_children():
             self.tree.delete(i)
-
         cur = self.db.cursor()
+        filter_owing = self.filter_owing.get()
+        # Main query
+        query = """
+            SELECT id, name, phone,
+                   (SELECT COUNT(*) FROM invoices WHERE customer_id=customers.id) AS invoice_count,
+                   COALESCE((SELECT SUM(total) FROM invoices WHERE customer_id=customers.id),0) AS total_spent,
+                   COALESCE((SELECT SUM(amount_owed) FROM invoices WHERE customer_id=customers.id), 0) AS total_owed
+            FROM customers
+        """
+        params = ()
+        # Filter/search logic
+        where = []
         if self.search_term:
-            q = f"%{self.search_term}%"
-            cur.execute("""
-                SELECT id, name, phone,
-                       (SELECT COUNT(*) FROM invoices WHERE customer_id=customers.id) AS invoice_count,
-                       COALESCE((SELECT SUM(total) FROM invoices WHERE customer_id=customers.id),0) AS total_spent
-                FROM customers
-                WHERE name LIKE ? OR phone LIKE ?
-                ORDER BY name
-            """, (q,q))
+            where.append("(name LIKE ? OR phone LIKE ?)")
+            params += (f"%{self.search_term}%", f"%{self.search_term}%")
+        if filter_owing:
+            where.append("(COALESCE((SELECT SUM(amount_owed) FROM invoices WHERE customer_id=customers.id), 0) > 0)")
+        if where:
+            query += " WHERE " + " AND ".join(where)
+        # Sort
+        if filter_owing:
+            query += " ORDER BY total_owed DESC"
         else:
-            cur.execute("""
-                SELECT id, name, phone,
-                       (SELECT COUNT(*) FROM invoices WHERE customer_id=customers.id) AS invoice_count,
-                       COALESCE((SELECT SUM(total) FROM invoices WHERE customer_id=customers.id),0) AS total_spent
-                FROM customers
-                ORDER BY name
-            """)
-
+            query += " ORDER BY name"
+        cur.execute(query, params)
         rows = cur.fetchall()
-        for cid, name, phone, inv_count, total_spent in rows:
+        self.displayed_rows = rows  # For export
+        for cid, name, phone, inv_count, total_spent, total_owed in rows:
             self.tree.insert(
                 "", "end", iid=str(cid),
-                values=(name, phone, inv_count, f"₹{total_spent:.2f}", "👤", "✏️", "🗑️")
+                values=(name, phone, inv_count, f"₹{total_spent:.2f}", f"₹{total_owed:.2f}", "👤", "✏️", "🗑️")
             )
 
     def _on_tree_click(self, event):
@@ -247,3 +277,23 @@ class CustomerFrame(ctk.CTkFrame):
         self.refresh_customers()
         if self.app:
             refresh_all(self.app)
+
+    def _export_csv(self):
+        if not self.displayed_rows:
+            messagebox.showwarning("Export CSV", "No customers to export.")
+            return
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv")],
+            title="Save customer list as CSV"
+        )
+        if not file_path:
+            return
+        with open(file_path, "w", newline='', encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Name", "Phone", "Invoices", "Total Spent", "Owed"])
+            for row in self.displayed_rows:
+                writer.writerow([
+                    row[1], row[2], row[3], f"{row[4]:.2f}", f"{row[5]:.2f}"
+                ])
+        messagebox.showinfo("Exported", f"Customer list exported to {file_path}")

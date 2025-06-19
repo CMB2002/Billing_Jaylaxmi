@@ -38,6 +38,7 @@ class ReportFrame(ctk.CTkFrame):
 
         self._build_filters()
         self._build_stats()
+        self._build_summary()
         self._build_table()
         self.refresh_report()
 
@@ -64,15 +65,29 @@ class ReportFrame(ctk.CTkFrame):
 
     def _build_stats(self):
         self.stats_frame = ctk.CTkFrame(self)
-        self.stats_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(0,8))
-        self.top_cust_label = ctk.CTkLabel(self.stats_frame, text="Top Customers: —", font=("Arial", 14, "bold"))
+        self.stats_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(0,2))
+        self.top_cust_label = ctk.CTkLabel(self.stats_frame, text="Top Customers: —", font=("Arial", 13, "bold"))
         self.top_cust_label.pack(side="left", padx=(0, 20))
-        self.top_prod_label = ctk.CTkLabel(self.stats_frame, text="Top Products: —", font=("Arial", 14, "bold"))
-        self.top_prod_label.pack(side="left")
+        self.top_prod_label = ctk.CTkLabel(self.stats_frame, text="Top Products: —", font=("Arial", 13, "bold"))
+        self.top_prod_label.pack(side="left", padx=(0, 8))
+
+    def _build_summary(self):
+        self.summary_frame = ctk.CTkFrame(self)
+        self.summary_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 6))
+        self.money_collected_label = ctk.CTkLabel(self.summary_frame, text="Collected: ₹0.00", font=("Arial", 14, "bold"))
+        self.money_collected_label.pack(side="left", padx=(0,18))
+        self.money_owed_label = ctk.CTkLabel(self.summary_frame, text="Owed: ₹0.00", font=("Arial", 14, "bold"), text_color="#e56")
+        self.money_owed_label.pack(side="left", padx=(0,18))
+        self.cash_label = ctk.CTkLabel(self.summary_frame, text="Cash: ₹0.00", font=("Arial", 13))
+        self.cash_label.pack(side="left", padx=(0,10))
+        self.upi_label = ctk.CTkLabel(self.summary_frame, text="UPI: ₹0.00", font=("Arial", 13))
+        self.upi_label.pack(side="left", padx=(0,10))
+        self.card_label = ctk.CTkLabel(self.summary_frame, text="Card: ₹0.00", font=("Arial", 13))
+        self.card_label.pack(side="left", padx=(0,10))
 
     def _build_table(self):
         frame = ctk.CTkFrame(self)
-        frame.grid(row=2, column=0, sticky="nsew", padx=20, pady=(0,10))
+        frame.grid(row=3, column=0, sticky="nsew", padx=20, pady=(0,10))
         frame.grid_rowconfigure(0, weight=1)
         frame.grid_columnconfigure(0, weight=1)
 
@@ -120,7 +135,10 @@ class ReportFrame(ctk.CTkFrame):
         end = datetime(d1.year, d1.month, d1.day, 23,59,59)
         cur = self.db.cursor()
         cur.execute("""
-            SELECT invoices.id, total, timestamp, customers.name, customers.phone, pdf_path, items
+            SELECT invoices.id, total, timestamp, customers.name, customers.phone, pdf_path, items, 
+                   COALESCE(amount_paid, total) as paid,
+                   COALESCE(amount_owed, 0) as owed,
+                   COALESCE(payment_methods, '') as payment_methods
             FROM invoices
             LEFT JOIN customers ON invoices.customer_id = customers.id
             WHERE timestamp BETWEEN ? AND ?
@@ -129,13 +147,24 @@ class ReportFrame(ctk.CTkFrame):
 
         rows = cur.fetchall()
         total_sum = 0
-
-        # For product aggregation
+        total_paid = 0
+        total_owed = 0
+        pm_breakdown = {"cash": 0.0, "upi": 0.0, "card": 0.0}
         product_sales = {}
 
-        for inv_id, total, ts, custname, custphone, pdf_path, items_json in rows:
+        for inv_id, total, ts, custname, custphone, pdf_path, items_json, paid, owed, pm_json in rows:
             cust_display = f"{custname or '-'} ({custphone or '-'})"
             total_sum += total
+            total_paid += paid or 0
+            total_owed += owed or 0
+            # Payment method split (JSON)
+            if pm_json:
+                try:
+                    pm = json.loads(pm_json)
+                    for key in pm_breakdown:
+                        pm_breakdown[key] += float(pm.get(key, 0))
+                except Exception:
+                    pass
             self.tree.insert(
                 "", "end", iid=str(inv_id),
                 values=(inv_id, f"₹{total:.2f}", ts, cust_display, "View | Delete")
@@ -147,6 +176,13 @@ class ReportFrame(ctk.CTkFrame):
                     product_sales[name] = product_sales.get(name, 0) + subtotal
             except Exception:
                 pass
+
+        # Update the summary
+        self.money_collected_label.configure(text=f"Collected: ₹{total_paid:.2f}")
+        self.money_owed_label.configure(text=f"Owed: ₹{total_owed:.2f}")
+        self.cash_label.configure(text=f"Cash: ₹{pm_breakdown['cash']:.2f}")
+        self.upi_label.configure(text=f"UPI: ₹{pm_breakdown['upi']:.2f}")
+        self.card_label.configure(text=f"Card: ₹{pm_breakdown['card']:.2f}")
 
         self.set_status(f"Loaded {len(rows)} invoices. Total Sales: ₹{total_sum:.2f}")
 
@@ -240,7 +276,10 @@ class ReportFrame(ctk.CTkFrame):
         end = datetime(d1.year, d1.month, d1.day, 23,59,59)
         cur = self.db.cursor()
         cur.execute("""
-            SELECT invoices.id, total, pdf_path, timestamp, customers.name, customers.phone
+            SELECT invoices.id, total, pdf_path, timestamp, customers.name, customers.phone,
+                   COALESCE(amount_paid, total) as paid,
+                   COALESCE(amount_owed, 0) as owed,
+                   COALESCE(payment_methods, '') as payment_methods
               FROM invoices
               LEFT JOIN customers ON invoices.customer_id = customers.id
              WHERE timestamp BETWEEN ? AND ?
@@ -253,7 +292,10 @@ class ReportFrame(ctk.CTkFrame):
         filename = os.path.join(REPORTS_DIR, f"invoices_report_{datetime.now():%Y%m%d_%H%M%S}.csv")
         with open(filename, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(["Invoice #", "Total", "PDF", "Timestamp", "Customer Name", "Customer Phone"])
+            writer.writerow([
+                "Invoice #", "Total", "PDF", "Timestamp", "Customer Name", "Customer Phone",
+                "Paid", "Owed", "Payment Methods"
+            ])
             for row in rows:
                 writer.writerow(row)
         self.set_status(f"Exported {len(rows)} invoices to {filename}")
