@@ -1,0 +1,16 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+
+# Databases
+*.db
+
+# Generated folders
+invoices/
+logs/
+reports/
+
+# Env files, editors, OS
+.env
+.vscode/
+*.log
