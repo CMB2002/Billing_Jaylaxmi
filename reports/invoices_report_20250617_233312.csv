@@ -1,0 +1,5 @@
+Invoice #,Total,PDF,Timestamp,Customer Name,Customer Phone
+14,2800.0,invoices\invoice_1750104208.pdf,2025-06-16 20:03:28,Kaustubh,8021425012
+13,2800.0,invoices\invoice_1750104195.pdf,2025-06-16 20:03:15,Kaustubh,8021425012
+12,1400.0,invoices\invoice_1750103251.pdf,2025-06-16 19:47:31,Kunal,1232123111
+11,18750.0,invoices\invoice_1750101982.pdf,2025-06-16 19:26:22,Chinmay,7058620579
