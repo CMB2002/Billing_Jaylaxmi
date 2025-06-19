@@ -21,9 +21,17 @@ class HoverTreeview(ttk.Treeview):
         row_id = self.identify_row(event.y)
         if self._last_hover != row_id:
             if self._last_hover:
-                self.tag_remove('hover', self._last_hover)
+                # Remove hover tag
+                current_tags = list(self.item(self._last_hover, "tags"))
+                if "hover" in current_tags:
+                    current_tags.remove("hover")
+                self.item(self._last_hover, tags=tuple(current_tags))
             if row_id:
-                self.tag_add('hover', row_id)
+                # Add hover tag
+                current_tags = list(self.item(row_id, "tags"))
+                if "hover" not in current_tags:
+                    current_tags.append("hover")
+                self.item(row_id, tags=tuple(current_tags))
             self._last_hover = row_id
 
 class ReportFrame(ctk.CTkFrame):
@@ -33,7 +41,7 @@ class ReportFrame(ctk.CTkFrame):
         self.app = app
         self.set_status = set_status or (lambda msg: None)
 
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(3, weight=1)  # Adjusted from 2 to 3 for extra row added
         self.grid_columnconfigure(0, weight=1)
 
         self._build_filters()
@@ -45,7 +53,7 @@ class ReportFrame(ctk.CTkFrame):
     def _build_filters(self):
         today = datetime.now().date()
         frm = ctk.CTkFrame(self)
-        frm.grid(row=0, column=0, sticky="ew", padx=20, pady=10)
+        frm.grid(row=0, column=0, sticky="ew", padx=20, pady=(8,8))  # Reduced pady from 10
         for i in range(7):
             frm.grid_columnconfigure(i, weight=1)
 
@@ -65,7 +73,7 @@ class ReportFrame(ctk.CTkFrame):
 
     def _build_stats(self):
         self.stats_frame = ctk.CTkFrame(self)
-        self.stats_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(0,2))
+        self.stats_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(0,2))  # Reduced bottom pady
         self.top_cust_label = ctk.CTkLabel(self.stats_frame, text="Top Customers: —", font=("Arial", 13, "bold"))
         self.top_cust_label.pack(side="left", padx=(0, 20))
         self.top_prod_label = ctk.CTkLabel(self.stats_frame, text="Top Products: —", font=("Arial", 13, "bold"))
@@ -73,7 +81,7 @@ class ReportFrame(ctk.CTkFrame):
 
     def _build_summary(self):
         self.summary_frame = ctk.CTkFrame(self)
-        self.summary_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 6))
+        self.summary_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 4))  # Reduced bottom pady
         self.money_collected_label = ctk.CTkLabel(self.summary_frame, text="Collected: ₹0.00", font=("Arial", 14, "bold"))
         self.money_collected_label.pack(side="left", padx=(0,18))
         self.money_owed_label = ctk.CTkLabel(self.summary_frame, text="Owed: ₹0.00", font=("Arial", 14, "bold"), text_color="#e56")

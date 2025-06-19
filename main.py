@@ -5,6 +5,7 @@ from frames.product import ProductFrame
 from frames.report import ReportFrame
 from frames.settings import SettingsFrame
 from database import Database
+import os
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")

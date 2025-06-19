@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox
 import json
+import os
 
 class CustomerProfileFrame(ctk.CTkToplevel):
     def __init__(self, parent, db, customer_id):

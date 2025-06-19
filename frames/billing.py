@@ -3,6 +3,7 @@ import tkinter as tk
 import customtkinter as ctk
 from tkinter import messagebox
 from frames.preview import PreviewWindow  # Import from frames directory
+from utils.helpers import refresh_all
 
 class BillingFrame(ctk.CTkFrame):
     def __init__(self, master, db, refresh_callback=None, set_status=None, app=None):
@@ -14,11 +15,14 @@ class BillingFrame(ctk.CTkFrame):
         self.refresh_callback = refresh_callback
         self.set_status = set_status or (lambda msg: None)
 
-        self.grid_rowconfigure(4, weight=1)
+        self.grid_rowconfigure(7, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self._build_customer_row()
         self._build_input_row()
         self._build_cart_area()
+        self._build_discount_area()
+        self._build_total_area()
+        self._build_paid_section()
         self._build_payment_options()
         self._build_bottom_row()
         self._build_customer_search_handlers()
@@ -125,12 +129,20 @@ class BillingFrame(ctk.CTkFrame):
         frm.grid_columnconfigure(0, weight=3)
         frm.grid_columnconfigure(1, weight=1)
         frm.grid_columnconfigure(2, weight=1)
+        frm.grid_columnconfigure(3, weight=1)
+
         self.prod_entry = ctk.CTkEntry(frm, placeholder_text="Product Name")
         self.prod_entry.grid(row=0, column=0, sticky="ew", padx=(0,5))
         self.prod_entry.bind("<KeyRelease>", self._on_name_type)
         self.prod_entry.bind("<Down>", self._on_entry_down)
         self.prod_entry.bind("<Return>", self._on_entry_return)
         self.prod_entry.bind("<Tab>", lambda e: self.qty_entry.focus_set())
+
+        # New: price entry, auto-filled but always editable
+        self.price_entry = ctk.CTkEntry(frm, placeholder_text="Price")
+        self.price_entry.grid(row=0, column=2, padx=5)
+        self.price_entry.bind("<Return>", lambda e: self.qty_entry.focus_set())
+
         self.suggestion_listbox = tk.Listbox(
             self, height=5,
             font=("Helvetica", 14),
@@ -141,12 +153,13 @@ class BillingFrame(ctk.CTkFrame):
         self.suggestion_listbox.bind("<Tab>", lambda e: self.qty_entry.focus_set())
         self.suggestion_listbox.bind("<Down>", self._on_suggest_down)
         self.suggestion_listbox.bind("<Up>", self._on_suggest_up)
+
         self.qty_entry = ctk.CTkEntry(frm, placeholder_text="Quantity")
         self.qty_entry.grid(row=0, column=1, padx=5)
         self.qty_entry.bind("<Return>", lambda e: self.add_btn.invoke())
         self.qty_entry.bind("<Tab>", lambda e: self.add_btn.focus_set())
         self.add_btn = ctk.CTkButton(frm, text="Add to Cart", command=self.add_to_cart)
-        self.add_btn.grid(row=0, column=2, padx=5)
+        self.add_btn.grid(row=0, column=3, padx=5)
         self.add_btn.bind("<Return>", lambda e: self.add_to_cart())
         self.add_btn.bind("<Tab>", lambda e: self.bill_btn.focus_set())
 
@@ -154,16 +167,20 @@ class BillingFrame(ctk.CTkFrame):
         term = self.prod_entry.get().strip()
         if not term:
             self.suggestion_listbox.place_forget()
+            self.price_entry.delete(0, "end")
             return
         cur = self.db.cursor()
         cur.execute(
-            "SELECT name FROM products WHERE name LIKE ? COLLATE NOCASE LIMIT 5",
+            "SELECT name, price FROM products WHERE name LIKE ? COLLATE NOCASE LIMIT 5",
             (f"%{term}%",)
         )
-        results = [r[0] for r in cur.fetchall()]
+        results = cur.fetchall()
         if results:
             self.suggestion_listbox.delete(0, tk.END)
-            for name in results:
+            # Autofill price with first suggestion
+            self.price_entry.delete(0, "end")
+            self.price_entry.insert(0, str(results[0][1]))
+            for name, price in results:
                 self.suggestion_listbox.insert(tk.END, name)
             x = self.prod_entry.winfo_rootx() - self.winfo_rootx()
             y = self.prod_entry.winfo_rooty() - self.winfo_rooty() + self.prod_entry.winfo_height()
@@ -174,6 +191,7 @@ class BillingFrame(ctk.CTkFrame):
             self.suggestion_listbox.lift()
         else:
             self.suggestion_listbox.place_forget()
+            self.price_entry.delete(0, "end")
 
     def _on_entry_down(self, event):
         if self.suggestion_listbox.size() > 0:
@@ -219,6 +237,13 @@ class BillingFrame(ctk.CTkFrame):
             val = lb.get(sel[0])
             self.prod_entry.delete(0, tk.END)
             self.prod_entry.insert(0, val)
+            # Autofill price for selected product
+            cur = self.db.cursor()
+            cur.execute("SELECT price FROM products WHERE name=?", (val,))
+            row = cur.fetchone()
+            if row:
+                self.price_entry.delete(0, "end")
+                self.price_entry.insert(0, str(row[0]))
         self.suggestion_listbox.place_forget()
         self.qty_entry.focus_set()
 
@@ -231,16 +256,17 @@ class BillingFrame(ctk.CTkFrame):
         name = self.prod_entry.get().strip()
         try:
             qty = int(self.qty_entry.get())
+            price = float(self.price_entry.get())
         except ValueError:
-            self.set_status("Invalid quantity.")
-            return messagebox.showerror("Input Error", "Enter a valid quantity.")
+            self.set_status("Invalid price/quantity.")
+            return messagebox.showerror("Input Error", "Enter valid price and quantity.")
         cur = self.db.cursor()
-        cur.execute("SELECT price, stock FROM products WHERE name = ?", (name,))
+        cur.execute("SELECT stock FROM products WHERE name = ?", (name,))
         row = cur.fetchone()
         if not row:
             self.set_status("Product not found.")
             return messagebox.showerror("Product Error", "Product not found.")
-        price, stock = row
+        stock = row[0]
         if qty > stock:
             from utils.logger import log
             log.warning(f"Low stock for product: {name} (requested {qty}, available {stock})")
@@ -255,6 +281,7 @@ class BillingFrame(ctk.CTkFrame):
         self.refresh_cart()
         self.prod_entry.delete(0, "end")
         self.qty_entry.delete(0, "end")
+        self.price_entry.delete(0, "end")
 
     def remove_from_cart(self, idx):
         name, qty, price, total = self.cart[idx]
@@ -278,36 +305,70 @@ class BillingFrame(ctk.CTkFrame):
                           command=lambda i=i: self.remove_from_cart(i)).pack(side="right", padx=5)
         self._update_summary()
 
-    # --- New: Payment and Discount section ---
-    def _build_payment_options(self):
-        # Payment methods
-        self.payment_methods = {"cash": ctk.BooleanVar(), "upi": ctk.BooleanVar(), "card": ctk.BooleanVar()}
-        self.payment_amounts = {"cash": ctk.StringVar(), "upi": ctk.StringVar(), "card": ctk.StringVar()}
-        pm_frame = ctk.CTkFrame(self)
-        pm_frame.grid(row=3, column=0, sticky="ew", padx=20, pady=(1, 1))
-        ctk.CTkLabel(pm_frame, text="Payment:").pack(side="left", padx=(0,8))
-        for method in self.payment_methods:
-            ctk.CTkCheckBox(pm_frame, text=method.capitalize(), variable=self.payment_methods[method]).pack(side="left", padx=3)
-            ctk.CTkEntry(pm_frame, textvariable=self.payment_amounts[method], width=70, placeholder_text="₹").pack(side="left", padx=1)
-        # Discount
+    # --- Discount section, comes after cart ---
+    def _build_discount_area(self):
+        df = ctk.CTkFrame(self)
+        df.grid(row=3, column=0, sticky="ew", padx=20, pady=(1, 1))
+        ctk.CTkLabel(df, text="Discount:").pack(side="left", padx=(0,3))
         self.discount_val = ctk.StringVar()
         self.discount_type = ctk.StringVar(value="₹")
-        df = ctk.CTkFrame(self)
-        df.grid(row=4, column=0, sticky="ew", padx=20, pady=(1, 1))
-        ctk.CTkLabel(df, text="Discount:").pack(side="left", padx=(0,3))
-        ctk.CTkEntry(df, textvariable=self.discount_val, width=70, placeholder_text="0").pack(side="left", padx=1)
-        ctk.CTkOptionMenu(df, values=["₹", "%"], variable=self.discount_type).pack(side="left", padx=1)
-        # Paid/Partial
-        self.paid_type = ctk.StringVar(value="Full")
-        self.partial_amount = ctk.StringVar()
+        discount_entry = ctk.CTkEntry(df, textvariable=self.discount_val, width=70, placeholder_text="0")
+        discount_entry.pack(side="left", padx=1)
+        discount_type_menu = ctk.CTkOptionMenu(df, values=["₹", "%"], variable=self.discount_type)
+        discount_type_menu.pack(side="left", padx=1)
+
+        # Add Apply Discount button
+        apply_btn = ctk.CTkButton(df, text="Apply Discount", width=120, command=self._apply_discount)
+        apply_btn.pack(side="left", padx=10)
+
+
+    # --- Total summary area (rounded, shown after discount) ---
+    def _build_total_area(self):
+        sf = ctk.CTkFrame(self)
+        sf.grid(row=4, column=0, sticky="ew", padx=20, pady=(1, 1))
+        self.total_label = ctk.CTkLabel(sf, text="Total: ₹0", font=("Arial", 17, "bold"))
+        self.total_label.pack(side="right", padx=(0, 18))
+
+    # --- Paid/Partial section (comes before payment modes) ---
+    def _build_paid_section(self):
         pf = ctk.CTkFrame(self)
         pf.grid(row=5, column=0, sticky="ew", padx=20, pady=(1, 2))
         ctk.CTkLabel(pf, text="Paid:").pack(side="left")
+        self.paid_type = ctk.StringVar(value="Full")
+        self.partial_amount = ctk.StringVar()
         ctk.CTkRadioButton(pf, text="Full", variable=self.paid_type, value="Full", command=self._update_partial_entry).pack(side="left", padx=2)
         ctk.CTkRadioButton(pf, text="Partial", variable=self.paid_type, value="Partial", command=self._update_partial_entry).pack(side="left", padx=2)
         self.partial_entry = ctk.CTkEntry(pf, textvariable=self.partial_amount, width=90, placeholder_text="Amount Paid")
         self.partial_entry.pack(side="left", padx=2)
         self.partial_entry.configure(state="disabled")
+
+    
+
+
+
+
+    def _build_payment_options(self):
+        pm_frame = ctk.CTkFrame(self)
+        pm_frame.grid(row=6, column=0, sticky="ew", padx=20, pady=(1, 1))
+        ctk.CTkLabel(pm_frame, text="Payment Amounts:").pack(side="left", padx=(0,8))
+
+        self.payment_amounts = {
+            "cash": ctk.StringVar(),
+            "upi": ctk.StringVar(),
+            "card": ctk.StringVar()
+        }
+        self.payment_entries = {}
+        for method in ["cash", "upi", "card"]:
+            ctk.CTkLabel(pm_frame, text=method.capitalize()+":").pack(side="left", padx=(5,1))
+            entry = ctk.CTkEntry(pm_frame, textvariable=self.payment_amounts[method], width=75, placeholder_text="0")
+            entry.pack(side="left", padx=(0,5))
+            entry.bind("<KeyRelease>", lambda e: self._update_payment_remain())
+            self.payment_entries[method] = entry
+
+        self.payment_remain_label = ctk.CTkLabel(pm_frame, text="", font=("Segoe UI", 11), text_color="#e56")
+        self.payment_remain_label.pack(side="left", padx=10)
+        # Init update
+        self._update_payment_remain()
 
     def _update_partial_entry(self):
         if self.paid_type.get() == "Partial":
@@ -315,19 +376,75 @@ class BillingFrame(ctk.CTkFrame):
         else:
             self.partial_entry.delete(0, "end")
             self.partial_entry.configure(state="disabled")
+        self._update_payment_remain()
 
     def _update_summary(self):
-        # Recalculate summary after cart/payment/discount changes (for UI updates if needed)
-        pass  # Add total/discount/paid/owed display if desired
+        subtotal = sum(item[3] for item in self.cart)
+        discount_val = self.discount_val.get().strip()
+        discount_type = self.discount_type.get()
+        discount = 0.0
+        if discount_val:
+            try:
+                dval = float(discount_val)
+                if discount_type == "%":
+                    discount = subtotal * dval / 100.0
+                else:
+                    discount = dval
+            except Exception:
+                discount = 0.0
+        grand_total = max(subtotal - discount, 0.0)
+        rounded_total = round(grand_total)
+        self.total_label.configure(text=f"Total: ₹{rounded_total}")
+        self._update_payment_remain()
+
+    def _update_payment_remain(self):
+        # Called on any payment/discount/partial change
+        subtotal = sum(item[3] for item in self.cart)
+        discount_val = self.discount_val.get().strip()
+        discount_type = self.discount_type.get()
+        discount = 0.0
+        if discount_val:
+            try:
+                dval = float(discount_val)
+                if discount_type == "%":
+                    discount = subtotal * dval / 100.0
+                else:
+                    discount = dval
+            except Exception:
+                discount = 0.0
+        grand_total = max(subtotal - discount, 0.0)
+        rounded_total = round(grand_total)
+
+        # How much is paid (from Paid section)
+        paid_type = self.paid_type.get()
+        if paid_type == "Full":
+            amount_paid = rounded_total
+        else:
+            try:
+                amount_paid = float(self.partial_amount.get())
+            except Exception:
+                amount_paid = 0.0
+        # What user has entered as split:
+        paid_sum = 0.0
+        for m in self.payment_amounts:
+            try:
+                paid_sum += float(self.payment_amounts[m].get())
+            except Exception:
+                pass
+        remain = max(0, amount_paid - paid_sum)
+        if remain > 0.01:
+            self.payment_remain_label.configure(text=f"Remaining to allocate: ₹{remain:.2f}")
+        elif remain < -0.01:
+            self.payment_remain_label.configure(text=f"Overpaid by: ₹{-remain:.2f}")
+        else:
+            self.payment_remain_label.configure(text="")
 
     # --- Bottom row and bill generation ---
     def _build_bottom_row(self):
         bottom = ctk.CTkFrame(self)
-        bottom.grid(row=6, column=0, sticky="ew", padx=20, pady=10)
+        bottom.grid(row=7, column=0, sticky="ew", padx=20, pady=10)
         bottom.grid_columnconfigure(0, weight=1)
         bottom.grid_columnconfigure(1, weight=1)
-        self.total_label = ctk.CTkLabel(bottom, text="Total: ₹0.00", font=("Arial", 16))
-        self.total_label.grid(row=0, column=0, sticky="w")
         self.bill_btn = ctk.CTkButton(bottom, text="Generate Bill", command=self.generate_bill)
         self.bill_btn.grid(row=0, column=1, sticky="e")
         self.bill_btn.bind("<Return>", lambda e: self.generate_bill())
@@ -366,40 +483,40 @@ class BillingFrame(ctk.CTkFrame):
             except ValueError:
                 return messagebox.showerror("Discount Error", "Enter valid discount amount or %.")
         grand_total = max(subtotal - discount, 0.0)
+        rounded_total = round(grand_total)
 
-        # Payment method splitting
-        pm_selected = {k: v.get() for k, v in self.payment_methods.items()}
-        pm_amounts = {}
-        paid_sum = 0.0
-        for method, selected in pm_selected.items():
-            if selected:
-                try:
-                    amt = float(self.payment_amounts[method].get() or 0)
-                    pm_amounts[method] = amt
-                    paid_sum += amt
-                except ValueError:
-                    return messagebox.showerror("Payment Error", f"Enter amount for {method.capitalize()}")
-        if not any(pm_selected.values()):
-            return messagebox.showerror("Payment Error", "Select at least one payment method.")
         # Paid/partial logic
         paid_type = self.paid_type.get()
-        amount_paid = 0.0
-        amount_owed = 0.0
         if paid_type == "Full":
-            amount_paid = grand_total
+            amount_paid = rounded_total
         else:
             try:
                 amount_paid = float(self.partial_amount.get())
             except ValueError:
                 return messagebox.showerror("Payment Error", "Enter valid amount paid.")
-            if amount_paid > grand_total:
-                return messagebox.showerror("Payment Error", "Paid amount can't exceed grand total.")
-            amount_owed = grand_total - amount_paid
-        # Validate split matches paid
+            if amount_paid > rounded_total:
+                return messagebox.showerror("Payment Error", "Paid amount can't exceed total.")
+
+        # Payment method split (just use what is filled in)
+        pm_amounts = {}
+        paid_sum = 0.0
+        for method in ["cash", "upi", "card"]:
+            val = self.payment_amounts[method].get()
+            try:
+                amt = float(val) if val else 0.0
+                if amt > 0:
+                    pm_amounts[method] = amt
+                paid_sum += amt
+            except Exception:
+                if val:
+                    return messagebox.showerror("Payment Error", f"Enter valid amount for {method.capitalize()}")
+        if paid_sum == 0:
+            return messagebox.showerror("Payment Error", "Enter payment amount(s).")
         if abs(paid_sum - amount_paid) > 0.01:
             return messagebox.showerror("Payment Error", "Sum of payment methods must equal amount paid.")
 
-        # Pass all info to PreviewWindow
+        amount_owed = rounded_total - amount_paid
+
         def _after_print_save():
             self.cart.clear()
             self.total = 0
@@ -408,7 +525,6 @@ class BillingFrame(ctk.CTkFrame):
             self.cust_phone_entry.delete(0, "end")
             for m in self.payment_amounts:
                 self.payment_amounts[m].set("")
-                self.payment_methods[m].set(False)
             self.discount_val.set("")
             self.paid_type.set("Full")
             self.partial_amount.set("")
@@ -424,7 +540,7 @@ class BillingFrame(ctk.CTkFrame):
         PreviewWindow(
             parent=self,
             cart=self.cart,
-            total=grand_total,
+            total=rounded_total,
             db=self.db,
             on_alter=_alter,
             on_finish=_after_print_save,
@@ -447,7 +563,6 @@ class BillingFrame(ctk.CTkFrame):
         self.cust_phone_entry.delete(0, "end")
         for m in self.payment_amounts:
             self.payment_amounts[m].set("")
-            self.payment_methods[m].set(False)
         self.discount_val.set("")
         self.paid_type.set("Full")
         self.partial_amount.set("")
@@ -456,3 +571,24 @@ class BillingFrame(ctk.CTkFrame):
         if self.app:
             refresh_all(self.app)
         self.set_status("Bill generated and cart cleared.")
+
+
+    def _apply_discount(self):
+        subtotal = sum(item[3] for item in self.cart)
+        discount_val = self.discount_val.get().strip()
+        discount_type = self.discount_type.get()
+        discount = 0.0
+        if discount_val:
+            try:
+                dval = float(discount_val)
+                if discount_type == "%":
+                    discount = subtotal * dval / 100.0
+                else:
+                    discount = dval
+            except Exception:
+                discount = 0.0
+        grand_total = max(subtotal - discount, 0.0)
+        rounded_total = round(grand_total)
+        self.total_label.configure(text=f"Total: ₹{rounded_total}")
+        self.set_status(f"Discount applied. New total: ₹{rounded_total}")
+
