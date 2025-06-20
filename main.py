@@ -4,6 +4,8 @@ from frames.customer import CustomerFrame
 from frames.product import ProductFrame
 from frames.report import ReportFrame
 from frames.settings import SettingsFrame
+from frames.dashboard import DashboardFrame
+from frames.expense import ExpenseFrame  # <-- Add this import
 from database import Database
 import os
 
@@ -11,7 +13,6 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 ctk.set_widget_scaling(1.1)
 
-# --- Password Dialog ---
 class PasswordDialog(ctk.CTkToplevel):
     def __init__(self, parent, password, on_success):
         super().__init__(parent)
@@ -46,7 +47,6 @@ class PasswordDialog(ctk.CTkToplevel):
             self.error_label.configure(text="Incorrect password. Try again.")
             self.entry.delete(0, "end")
 
-# --- Modern Main App ---
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -57,7 +57,6 @@ class App(ctk.CTk):
         self.geometry("1180x770")
         self.minsize(1000, 670)
 
-        # AppBar
         header = ctk.CTkFrame(self, height=58, corner_radius=0, fg_color="#1a1e25")
         header.pack(side="top", fill="x")
         ctk.CTkLabel(
@@ -68,30 +67,29 @@ class App(ctk.CTk):
             text_color="#7dd3fc"
         ).pack(side="left", padx=24, pady=12)
 
-        # Status Bar
         self.status_bar = ctk.CTkLabel(
             self, text="Ready", anchor="w", font=("Segoe UI", 12),
             height=28, fg_color="#23272f"
         )
         self.status_bar.pack(side="bottom", fill="x")
 
-        # Sidebar + Content
         body = ctk.CTkFrame(self, fg_color="#181c23")
         body.pack(expand=True, fill="both")
         body.grid_columnconfigure(1, weight=1)
         body.grid_rowconfigure(0, weight=1)
 
-        # Sidebar Navigation (modern look)
         sidebar = ctk.CTkFrame(body, width=220, corner_radius=18, fg_color="#23272f")
-        sidebar.grid(row=0, column=0, sticky="ns", padx=(16,0), pady=16)
+        sidebar.grid(row=0, column=0, sticky="ns", padx=(16, 0), pady=16)
         self.side_buttons = {}
 
         tab_data = [
+            ("Dashboard", "📊", DashboardFrame),
             ("Products", "📦", ProductFrame),
             ("Billing", "🧾", BillingFrame),
-            ("Reports", "📊", ReportFrame),
+            ("Reports", "📋", ReportFrame),
+            ("Expenses", "💸", ExpenseFrame),  # <-- Add expenses tab here
             ("Customers", "👥", CustomerFrame),
-            ("Settings", "⚙️", SettingsFrame)
+            ("Settings", "⚙️", SettingsFrame),
         ]
 
         for name, icon, FrameClass in tab_data:
@@ -108,20 +106,18 @@ class App(ctk.CTk):
             btn.pack(fill="x", pady=7, padx=14)
             self.side_buttons[name] = btn
 
-        # Content Container
         self.container = ctk.CTkFrame(body, corner_radius=18, fg_color="#212836")
         self.container.grid(row=0, column=1, sticky="nsew", padx=18, pady=18)
         self.container.grid_columnconfigure(0, weight=1)
         self.container.grid_rowconfigure(0, weight=1)
 
-        # Initialize all frames and pass 'app=self' to enable refresh_all usage
         self.frames = {}
         for name, _, FrameClass in tab_data:
             frame = FrameClass(self.container, db=self.db, set_status=self.set_status, app=self)
             frame.grid(row=0, column=0, sticky="nsew")
             self.frames[name] = frame
 
-        self.show_tab("Products")
+        self.show_tab("Dashboard")
 
     def show_tab(self, name):
         for key, frame in self.frames.items():
@@ -139,7 +135,6 @@ def launch_main():
     app.mainloop()
 
 if __name__ == "__main__":
-    # Start with a password dialog
     root = ctk.CTk()
     root.withdraw()
     def on_success():
