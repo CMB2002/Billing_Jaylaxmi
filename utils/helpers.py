@@ -14,7 +14,9 @@ def refresh_all(app):
         "Products": "refresh_products",
         "Reports": "refresh_report",
         "Billing": "refresh_cart",
-        "Settings": None,  # Add method name if needed
+        "Dashboard": "_draw_all_charts",  # Added this
+        "Expenses": "refresh_expenses",   # Added this
+        "Settings": None,
     }
 
     for frame_name, refresh_method in frames_to_refresh.items():

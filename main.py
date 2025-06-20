@@ -5,7 +5,8 @@ from frames.product import ProductFrame
 from frames.report import ReportFrame
 from frames.settings import SettingsFrame
 from frames.dashboard import DashboardFrame
-from frames.expense import ExpenseFrame  # <-- Add this import
+from frames.expense import ExpenseFrame
+from frames.staff import StaffFrame  # <-- Added Staff import
 from database import Database
 import os
 
@@ -87,7 +88,8 @@ class App(ctk.CTk):
             ("Products", "📦", ProductFrame),
             ("Billing", "🧾", BillingFrame),
             ("Reports", "📋", ReportFrame),
-            ("Expenses", "💸", ExpenseFrame),  # <-- Add expenses tab here
+            ("Expenses", "💸", ExpenseFrame),
+            ("Staff", "👔", StaffFrame),        # <-- Added here
             ("Customers", "👥", CustomerFrame),
             ("Settings", "⚙️", SettingsFrame),
         ]
