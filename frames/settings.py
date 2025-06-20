@@ -35,47 +35,60 @@ class SettingsFrame(ctk.CTkFrame):
         self.db.commit()
 
     def _build_form(self):
-        frm = ctk.CTkFrame(self)
-        frm.pack(padx=20, pady=20, fill="both", expand=True)
+        # Modern, clean header
+        ctk.CTkLabel(
+            self,
+            text="⚙️ Application Settings",
+            font=("Segoe UI", 20, "bold"),
+            text_color="#7dd3fc"
+        ).pack(anchor="w", padx=24, pady=(20, 6))
 
-        # Shop Details
-        shop_frame = ctk.CTkLabel(frm, text="🏪 Shop Information", font=("Segoe UI", 15, "bold"))
-        shop_frame.grid(row=0, column=0, columnspan=2, pady=(5,10))
+        frm = ctk.CTkFrame(self, fg_color="transparent")
+        frm.pack(padx=24, pady=(2, 8), fill="both", expand=True)
 
+        # Shop Information section
         labels = ["Shop Name:", "Shop Address:", "Phone Number:", "Email:"]
         self.entries = {}
 
         for i, label in enumerate(labels):
-            ctk.CTkLabel(frm, text=label, font=("Segoe UI", 13)).grid(row=i+1, column=0, sticky="e", padx=10, pady=5)
-            entry = ctk.CTkEntry(frm, width=350)
-            entry.grid(row=i+1, column=1, pady=5, sticky="w")
+            ctk.CTkLabel(frm, text=label, font=("Segoe UI", 13)).grid(row=i, column=0, sticky="e", padx=12, pady=6)
+            entry = ctk.CTkEntry(frm, width=370, font=("Segoe UI", 13), corner_radius=7)
+            entry.grid(row=i, column=1, pady=6, sticky="w")
             self.entries[label] = entry
 
-        # Invoice & Currency Settings
-        inv_frame = ctk.CTkLabel(frm, text="🧾 Invoice & Currency Settings", font=("Segoe UI", 15, "bold"))
-        inv_frame.grid(row=5, column=0, columnspan=2, pady=(15,10))
+        # Invoice & currency row
+        ctk.CTkLabel(frm, text="GST Percent (%):", font=("Segoe UI", 13)).grid(row=4, column=0, sticky="e", padx=12, pady=6)
+        self.gst = ctk.CTkEntry(frm, width=100, font=("Segoe UI", 13), corner_radius=7)
+        self.gst.grid(row=4, column=1, pady=6, sticky="w")
 
-        ctk.CTkLabel(frm, text="GST Percent (%):", font=("Segoe UI", 13)).grid(row=6, column=0, sticky="e", padx=10, pady=5)
-        self.gst = ctk.CTkEntry(frm, width=100)
-        self.gst.grid(row=6, column=1, pady=5, sticky="w")
+        ctk.CTkLabel(frm, text="Currency Symbol:", font=("Segoe UI", 13)).grid(row=5, column=0, sticky="e", padx=12, pady=6)
+        self.currency = ctk.CTkEntry(frm, width=100, font=("Segoe UI", 13), corner_radius=7)
+        self.currency.grid(row=5, column=1, pady=6, sticky="w")
 
-        ctk.CTkLabel(frm, text="Currency Symbol:", font=("Segoe UI", 13)).grid(row=7, column=0, sticky="e", padx=10, pady=5)
-        self.currency = ctk.CTkEntry(frm, width=100)
-        self.currency.grid(row=7, column=1, pady=5, sticky="w")
+        # Invoice note
+        ctk.CTkLabel(frm, text="Invoice Note:", font=("Segoe UI", 13)).grid(row=6, column=0, sticky="ne", padx=12, pady=6)
+        self.invoice_note = ctk.CTkTextbox(frm, width=370, height=80, font=("Segoe UI", 13))
+        self.invoice_note.grid(row=6, column=1, pady=6, sticky="w")
 
-        ctk.CTkLabel(frm, text="Invoice Note:", font=("Segoe UI", 13)).grid(row=8, column=0, sticky="ne", padx=10, pady=5)
-        self.invoice_note = ctk.CTkTextbox(frm, width=350, height=80)
-        self.invoice_note.grid(row=8, column=1, pady=5, sticky="w")
+        # Buttons
+        btns = ctk.CTkFrame(self, fg_color="transparent")
+        btns.pack(padx=24, pady=(10, 16), fill="x")
 
-        # Buttons Frame
-        btns = ctk.CTkFrame(frm)
-        btns.grid(row=9, column=0, columnspan=2, pady=(15,5))
-
-        ctk.CTkButton(btns, text="💾 Save Settings", command=self._save_settings).pack(side="left", padx=8)
-        ctk.CTkButton(btns, text="🔄 Reload", command=self._load_settings).pack(side="left", padx=8)
-        ctk.CTkButton(btns, text="🔙 Reset to Default", fg_color="tomato", command=self._reset_defaults).pack(side="left", padx=8)
-        ctk.CTkButton(btns, text="📤 Export Settings", command=self._export_settings).pack(side="left", padx=8)
-        ctk.CTkButton(btns, text="📥 Import Settings", command=self._import_settings).pack(side="left", padx=8)
+        ctk.CTkButton(btns, text="💾 Save", font=("Segoe UI", 13, "bold"),
+                      fg_color="#324076", hover_color="#7dd3fc", corner_radius=10,
+                      width=110, command=self._save_settings).pack(side="left", padx=8)
+        ctk.CTkButton(btns, text="🔄 Reload", font=("Segoe UI", 13),
+                      fg_color="#212836", hover_color="#324076", corner_radius=10,
+                      width=110, command=self._load_settings).pack(side="left", padx=8)
+        ctk.CTkButton(btns, text="🔙 Reset", font=("Segoe UI", 13),
+                      fg_color="#e56", hover_color="#ffb0b0", corner_radius=10,
+                      width=110, command=self._reset_defaults).pack(side="left", padx=8)
+        ctk.CTkButton(btns, text="📤 Export", font=("Segoe UI", 13),
+                      fg_color="#1a8cff", hover_color="#0e68b1", corner_radius=10,
+                      width=110, command=self._export_settings).pack(side="left", padx=8)
+        ctk.CTkButton(btns, text="📥 Import", font=("Segoe UI", 13),
+                      fg_color="#23272f", hover_color="#324076", corner_radius=10,
+                      width=110, command=self._import_settings).pack(side="left", padx=8)
 
     def _load_settings(self):
         cur = self.db.cursor()
@@ -178,4 +191,3 @@ class SettingsFrame(ctk.CTkFrame):
             if self.app:
                 from utils.helpers import refresh_all
                 refresh_all(self.app)
-
