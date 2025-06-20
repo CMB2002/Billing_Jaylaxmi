@@ -1,7 +1,7 @@
 # ui_windows.py
 
 import customtkinter as ctk
-from tkinter import Toplevel, messagebox
+from tkinter import messagebox
 
 # ---- Generic Confirm Dialog ----
 class ConfirmDialog(ctk.CTkToplevel):
@@ -10,12 +10,40 @@ class ConfirmDialog(ctk.CTkToplevel):
         self.title(title)
         self.grab_set()
         self.resizable(False, False)
-        self.geometry("360x160")
-        ctk.CTkLabel(self, text=message, font=("Segoe UI", 13), wraplength=340).pack(padx=20, pady=(22,12))
-        btn_frame = ctk.CTkFrame(self)
-        btn_frame.pack(pady=(0,18))
-        ctk.CTkButton(btn_frame, text="Yes", width=90, command=lambda: (on_confirm(), self.destroy())).pack(side="left", padx=14)
-        ctk.CTkButton(btn_frame, text="No", width=90, command=self.destroy).pack(side="right", padx=14)
+        self.geometry("390x180")
+        self.configure(fg_color="#23272f")
+        ctk.CTkLabel(
+            self,
+            text=f"❓ {message}",
+            font=("Segoe UI", 15, "bold"),
+            text_color="#7dd3fc",
+            wraplength=350
+        ).pack(padx=22, pady=(24, 12))
+
+        btn_frame = ctk.CTkFrame(self, corner_radius=12, fg_color="#23272f")
+        btn_frame.pack(pady=(0, 14))
+
+        ctk.CTkButton(
+            btn_frame,
+            text="✔️ Yes",
+            width=96,
+            font=("Segoe UI", 13, "bold"),
+            fg_color="#2d6a4f",
+            hover_color="#43aa8b",
+            corner_radius=9,
+            command=lambda: (on_confirm(), self.destroy())
+        ).pack(side="left", padx=18)
+
+        ctk.CTkButton(
+            btn_frame,
+            text="❌ No",
+            width=96,
+            font=("Segoe UI", 13, "bold"),
+            fg_color="#293040",
+            hover_color="#e56",
+            corner_radius=9,
+            command=self.destroy
+        ).pack(side="right", padx=18)
 
 # ---- Generic Edit Form ----
 class EditFormDialog(ctk.CTkToplevel):
@@ -24,20 +52,47 @@ class EditFormDialog(ctk.CTkToplevel):
         self.title(title)
         self.grab_set()
         self.resizable(False, False)
+        self.configure(fg_color="#23272f")
         self.entries = {}
-        frm = ctk.CTkFrame(self)
-        frm.pack(padx=30, pady=22, fill="both", expand=True)
+        frm = ctk.CTkFrame(self, fg_color="#212836", corner_radius=16)
+        frm.pack(padx=26, pady=16, fill="both", expand=True)
+        ctk.CTkLabel(frm, text=f"📝 {title}", font=("Segoe UI", 16, "bold"), text_color="#7dd3fc").grid(
+            row=0, column=0, columnspan=2, pady=(4, 14)
+        )
         for idx, field in enumerate(fields):
-            ctk.CTkLabel(frm, text=field + ":", anchor="e").grid(row=idx, column=0, sticky="e", pady=7, padx=7)
-            entry = ctk.CTkEntry(frm)
-            entry.grid(row=idx, column=1, pady=7, padx=7, sticky="ew")
+            ctk.CTkLabel(frm, text=field + ":", anchor="e", font=("Segoe UI", 13)).grid(
+                row=idx + 1, column=0, sticky="e", pady=7, padx=7
+            )
+            entry = ctk.CTkEntry(frm, font=("Segoe UI", 13), corner_radius=8)
+            entry.grid(row=idx + 1, column=1, pady=7, padx=7, sticky="ew")
             entry.insert(0, initial_values.get(field, ""))
             self.entries[field] = entry
         frm.grid_columnconfigure(1, weight=1)
-        btn_frame = ctk.CTkFrame(self)
-        btn_frame.pack(pady=(0,18))
-        ctk.CTkButton(btn_frame, text="Save", width=90, command=lambda: self._submit(on_submit)).pack(side="left", padx=14)
-        ctk.CTkButton(btn_frame, text="Cancel", width=90, command=self.destroy).pack(side="right", padx=14)
+
+        btn_frame = ctk.CTkFrame(self, fg_color="#23272f")
+        btn_frame.pack(pady=(0, 16))
+
+        ctk.CTkButton(
+            btn_frame,
+            text="💾 Save",
+            width=96,
+            font=("Segoe UI", 13, "bold"),
+            fg_color="#324076",
+            hover_color="#7dd3fc",
+            corner_radius=9,
+            command=lambda: self._submit(on_submit)
+        ).pack(side="left", padx=16)
+
+        ctk.CTkButton(
+            btn_frame,
+            text="Cancel",
+            width=96,
+            font=("Segoe UI", 13, "bold"),
+            fg_color="#293040",
+            hover_color="#e56",
+            corner_radius=9,
+            command=self.destroy
+        ).pack(side="right", padx=16)
 
     def _submit(self, on_submit):
         values = {field: entry.get().strip() for field, entry in self.entries.items()}
@@ -46,10 +101,8 @@ class EditFormDialog(ctk.CTkToplevel):
 
 # ---- Simple Info Message ----
 def info_dialog(parent, title, message):
-    messagebox.showinfo(title, message, parent=parent)
+    messagebox.showinfo(f"ℹ️ {title}", message, parent=parent)
 
 # ---- Simple Error Message ----
 def error_dialog(parent, title, message):
-    messagebox.showerror(title, message, parent=parent)
-
-
+    messagebox.showerror(f"❌ {title}", message, parent=parent)

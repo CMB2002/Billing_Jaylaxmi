@@ -35,37 +35,48 @@ class CustomerFrame(ctk.CTkFrame):
         self.grid_rowconfigure(4, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
+        self._build_header()
         self._build_form()
         self._build_search_and_filter()
         self._build_table()
         self._build_export_button()
         self.refresh_customers()
 
+    def _build_header(self):
+        ctk.CTkLabel(
+            self,
+            text="👥 Customer Management",
+            font=("Segoe UI", 20, "bold"),
+            text_color="#7dd3fc"
+        ).grid(row=0, column=0, sticky="w", padx=24, pady=(16, 4))
+
     def _build_form(self):
-        frm = ctk.CTkFrame(self)
-        frm.grid(row=0, column=0, sticky="ew", padx=20, pady=(2, 1))
+        frm = ctk.CTkFrame(self, fg_color="transparent")
+        frm.grid(row=1, column=0, sticky="ew", padx=20, pady=(6, 2))
         frm.grid_columnconfigure(0, weight=2)
         frm.grid_columnconfigure(1, weight=2)
         frm.grid_columnconfigure(2, weight=1)
 
-        self.name_entry = ctk.CTkEntry(frm, placeholder_text="Customer Name")
-        self.phone_entry = ctk.CTkEntry(frm, placeholder_text="Phone Number")
-        self.name_entry.grid(row=0, column=0, padx=5, sticky="ew")
-        self.phone_entry.grid(row=0, column=1, padx=5, sticky="ew")
-        add_btn = ctk.CTkButton(frm, text="Add Customer", command=self._on_add)
-        add_btn.grid(row=0, column=2, padx=5)
+        self.name_entry = ctk.CTkEntry(frm, placeholder_text="Customer Name", font=("Segoe UI", 13), corner_radius=8)
+        self.phone_entry = ctk.CTkEntry(frm, placeholder_text="Phone Number", font=("Segoe UI", 13), corner_radius=8)
+        self.name_entry.grid(row=0, column=0, padx=6, sticky="ew")
+        self.phone_entry.grid(row=0, column=1, padx=6, sticky="ew")
+        add_btn = ctk.CTkButton(frm, text="➕ Add Customer", font=("Segoe UI", 13, "bold"),
+                                fg_color="#324076", hover_color="#7dd3fc", corner_radius=10,
+                                command=self._on_add)
+        add_btn.grid(row=0, column=2, padx=6, sticky="ew")
 
         self.name_entry.bind("<Return>", lambda e: self.phone_entry.focus_set())
         self.phone_entry.bind("<Return>", lambda e: add_btn.invoke())
 
     def _build_search_and_filter(self):
-        sf = ctk.CTkFrame(self)
-        sf.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 1))
+        sf = ctk.CTkFrame(self, fg_color="transparent")
+        sf.grid(row=2, column=0, sticky="ew", padx=20, pady=(4, 4))
         sf.grid_columnconfigure(0, weight=1)
         sf.grid_columnconfigure(1, weight=0)
 
-        self.search_entry = ctk.CTkEntry(sf, placeholder_text="Search customers...")
-        self.search_entry.grid(row=0, column=0, sticky="ew", padx=(0,5))
+        self.search_entry = ctk.CTkEntry(sf, placeholder_text="🔍 Search customers...", font=("Segoe UI", 13), corner_radius=7)
+        self.search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5), pady=6)
         self.search_entry.bind("<KeyRelease>", self._on_search)
 
         filter_btn = ctk.CTkCheckBox(
@@ -74,13 +85,14 @@ class CustomerFrame(ctk.CTkFrame):
             variable=self.filter_owing,
             command=self.refresh_customers,
             width=30,
-            height=26
+            height=26,
+            font=("Segoe UI", 13)
         )
-        filter_btn.grid(row=0, column=1, sticky="e", padx=(2,0))
+        filter_btn.grid(row=0, column=1, sticky="e", padx=(2, 0), pady=6)
 
     def _build_table(self):
-        frame = ctk.CTkFrame(self)
-        frame.grid(row=2, column=0, sticky="nsew", padx=20, pady=(0, 2))
+        frame = ctk.CTkFrame(self, fg_color="transparent")
+        frame.grid(row=3, column=0, sticky="nsew", padx=20, pady=(0, 2))
         frame.grid_rowconfigure(0, weight=1)
         frame.grid_columnconfigure(0, weight=1)
 
@@ -126,9 +138,11 @@ class CustomerFrame(ctk.CTkFrame):
         self.tree.bind("<Leave>", lambda e: self.tree.config(cursor=""))
 
     def _build_export_button(self):
-        exp_frame = ctk.CTkFrame(self)
-        exp_frame.grid(row=3, column=0, sticky="ew", padx=20, pady=(0, 1))
-        export_btn = ctk.CTkButton(exp_frame, text="Export CSV", command=self._export_csv)
+        exp_frame = ctk.CTkFrame(self, fg_color="transparent")
+        exp_frame.grid(row=4, column=0, sticky="ew", padx=20, pady=(4, 6))
+        export_btn = ctk.CTkButton(exp_frame, text="📤 Export CSV", font=("Segoe UI", 13),
+                                   fg_color="#1a8cff", hover_color="#0e68b1", corner_radius=10,
+                                   command=self._export_csv)
         export_btn.pack(side="right", padx=2)
 
     def _on_tree_motion(self, event):
@@ -138,8 +152,7 @@ class CustomerFrame(ctk.CTkFrame):
             return
         if region == "cell":
             col = self.tree.identify_column(event.x)
-            # Only change cursor for profile, edit, delete columns
-            if col in ("#6", "#7", "#8"):
+            if col in ("#6", "#7", "#8"):  # profile, edit, delete columns
                 self.tree.config(cursor="hand2")
             else:
                 self.tree.config(cursor="")
@@ -180,7 +193,6 @@ class CustomerFrame(ctk.CTkFrame):
             self.tree.delete(i)
         cur = self.db.cursor()
         filter_owing = self.filter_owing.get()
-        # Main query
         query = """
             SELECT id, name, phone,
                    (SELECT COUNT(*) FROM invoices WHERE customer_id=customers.id) AS invoice_count,
@@ -189,7 +201,6 @@ class CustomerFrame(ctk.CTkFrame):
             FROM customers
         """
         params = ()
-        # Filter/search logic
         where = []
         if self.search_term:
             where.append("(name LIKE ? OR phone LIKE ?)")
@@ -198,14 +209,13 @@ class CustomerFrame(ctk.CTkFrame):
             where.append("(COALESCE((SELECT SUM(amount_owed) FROM invoices WHERE customer_id=customers.id), 0) > 0)")
         if where:
             query += " WHERE " + " AND ".join(where)
-        # Sort
         if filter_owing:
             query += " ORDER BY total_owed DESC"
         else:
             query += " ORDER BY name"
         cur.execute(query, params)
         rows = cur.fetchall()
-        self.displayed_rows = rows  # For export
+        self.displayed_rows = rows
         for cid, name, phone, inv_count, total_spent, total_owed in rows:
             self.tree.insert(
                 "", "end", iid=str(cid),
@@ -220,7 +230,6 @@ class CustomerFrame(ctk.CTkFrame):
         col = self.tree.identify_column(event.x)
         if not rowid:
             return
-
         col_idx = int(col[1:]) - 1
         colname = self.tree["columns"][col_idx]
 
@@ -265,7 +274,7 @@ class CustomerFrame(ctk.CTkFrame):
         elif colname == "profile":
             cid = int(rowid)
             profile_win = CustomerProfileFrame(self, self.db, customer_id=cid)
-            profile_win.transient(self.winfo_toplevel())  # Make modal to main window
+            profile_win.transient(self.winfo_toplevel())
             profile_win.grab_set()
             profile_win.focus_set()
 
