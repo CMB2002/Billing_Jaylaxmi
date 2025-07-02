@@ -52,7 +52,7 @@ class ReportFrame(ctk.CTkFrame):
     def _build_header(self):
         ctk.CTkLabel(
             self,
-            text="📊 Sales & Invoice Reports",
+            text="📊 Sales & Estimate Reports",
             font=("Segoe UI", 20, "bold"),
             text_color="#7dd3fc"
         ).grid(row=0, column=0, sticky="w", padx=24, pady=(16, 0))

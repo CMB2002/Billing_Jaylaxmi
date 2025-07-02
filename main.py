@@ -1,12 +1,12 @@
 import customtkinter as ctk
-from frames.billing import BillingFrame
+from frames.billing.BillingTabs import BillingTabs         # <-- NEW import!
 from frames.customer import CustomerFrame
 from frames.product import ProductFrame
 from frames.report import ReportFrame
 from frames.settings import SettingsFrame
 from frames.dashboard import DashboardFrame
 from frames.expense import ExpenseFrame
-from frames.staff import StaffFrame  # <-- Added Staff import
+from frames.staff import StaffFrame
 from database import Database
 import os
 
@@ -86,10 +86,10 @@ class App(ctk.CTk):
         tab_data = [
             ("Dashboard", "📊", DashboardFrame),
             ("Products", "📦", ProductFrame),
-            ("Billing", "🧾", BillingFrame),
+            ("Billing", "🧾", BillingTabs),        # <-- Use BillingTabs here!
             ("Reports", "📋", ReportFrame),
             ("Expenses", "💸", ExpenseFrame),
-            ("Staff", "👔", StaffFrame),        # <-- Added here
+            ("Staff", "👔", StaffFrame),
             ("Customers", "👥", CustomerFrame),
             ("Settings", "⚙️", SettingsFrame),
         ]

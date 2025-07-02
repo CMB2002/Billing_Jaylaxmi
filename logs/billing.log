@@ -3,3 +3,5 @@
 2025-06-19 11:47:24,335 [INFO] Added customer: Amay
 2025-06-19 21:02:50,592 [WARNING] Low stock for product: Photocell (requested 45, available 22)
 2025-06-20 23:02:00,807 [INFO] Product added successfully: abra
+2025-07-02 14:46:05,143 [INFO] Product added successfully: lamp
+2025-07-02 14:46:25,871 [INFO] Product added successfully: lamp2

@@ -35,6 +35,19 @@ class PreviewWindow(ctk.CTkToplevel):
         self.title("Preview Invoice")
         self.geometry("740x600")
         self.minsize(520, 420)
+
+        # --- Cart: convert dicts to tuples for display if needed ---
+        if self.cart and isinstance(self.cart[0], dict):
+            self.cart = [
+                (
+                    item.get('name', ''),
+                    item.get('qty', 0),
+                    item.get('assigned_price', item.get('price', 0)),
+                    item.get('total', item.get('subtotal', 0))
+                )
+                for item in self.cart
+            ]
+
         self._draw_ui()
 
     def _draw_ui(self):
@@ -127,12 +140,15 @@ class PreviewWindow(ctk.CTkToplevel):
             cur.execute(
                 """
                 INSERT INTO invoices (
-                    customer_id, total, items, pdf_path, notes, timestamp,
+                    customer_id, customer_name, customer_phone, total, items, pdf_path, notes, timestamp,
                     discount, discount_type, payment_methods, amount_paid, amount_owed
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    self.customer_id, self.total, items_json, pdf_path, self.invoice_note.get(),
+                    self.customer_id,
+                    self.customer_name,
+                    self.customer_phone,
+                    self.total, items_json, pdf_path, self.invoice_note.get(),
                     datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     self.discount, self.discount_type, pm_json, self.amount_paid, self.amount_owed
                 )
