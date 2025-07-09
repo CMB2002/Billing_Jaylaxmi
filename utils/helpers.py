@@ -26,3 +26,11 @@ def refresh_all(app):
                 getattr(frame, refresh_method)()
             except Exception as e:
                 log.error(f"Failed to refresh {frame_name} frame: {e}")
+
+
+def get_setting(db, key, default=""):
+    cur = db.cursor()
+    cur.execute("SELECT value FROM settings WHERE key=?", (key,))
+    row = cur.fetchone()
+    return row[0] if row else default
+

@@ -172,9 +172,9 @@ class BillingFrame(ctk.CTkFrame):
         profit_option = self.profit_option.get()
         assigned_prices = Calculate_Prices(product_data, profit_option=profit_option)
         for i, price in enumerate(assigned_prices):
-            price_rounded = int(round(float(price)))
-            self.cart[i]["assigned_price"] = price_rounded
-            self.cart[i]["total"] = price_rounded * self.cart[i]["qty"]
+            price_float = float(price)
+            self.cart[i]["assigned_price"] = price_float
+            self.cart[i]["total"] = price_float * self.cart[i]["qty"]
 
         self.cart_area.set_edit_mode(False)
         self.cart_area.refresh(self.cart)
@@ -194,7 +194,7 @@ class BillingFrame(ctk.CTkFrame):
         for idx, entry in enumerate(self.cart_area.price_entry_widgets):
             if entry is not None:
                 try:
-                    val = int(round(float(entry.get())))
+                    val = float(entry.get())
                     self.cart[idx]["assigned_price"] = val
                     self.cart[idx]["total"] = val * self.cart[idx]["qty"]
                 except Exception:

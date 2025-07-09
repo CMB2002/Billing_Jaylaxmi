@@ -2,15 +2,18 @@ import customtkinter as ctk
 from tkinter import messagebox, filedialog
 import json
 import os
+from utils.helpers import get_setting
 
 DEFAULTS = {
     "shop_name": "Jaylaxmi Shop",
     "shop_addr": "",
-    "gst": "0",
+    "gst": "0",           # GST percent
+    "gst_no": "",         # GST number (for header)
     "phone": "",
     "email": "",
     "currency": "₹",
-    "invoice_note": "Thank you for shopping with us!"
+    "invoice_note": "Thank you for shopping with us!",
+    "logo_path": ""
 }
 
 class SettingsFrame(ctk.CTkFrame):
@@ -35,7 +38,7 @@ class SettingsFrame(ctk.CTkFrame):
         self.db.commit()
 
     def _build_form(self):
-        # Modern, clean header
+        # Modern header
         ctk.CTkLabel(
             self,
             text="⚙️ Application Settings",
@@ -46,8 +49,12 @@ class SettingsFrame(ctk.CTkFrame):
         frm = ctk.CTkFrame(self, fg_color="transparent")
         frm.pack(padx=24, pady=(2, 8), fill="both", expand=True)
 
-        # Shop Information section
-        labels = ["Shop Name:", "Shop Address:", "Phone Number:", "Email:"]
+        labels = [
+            "Shop Name:",
+            "Shop Address:",
+            "Phone Number:",
+            "Email:"
+        ]
         self.entries = {}
 
         for i, label in enumerate(labels):
@@ -56,21 +63,33 @@ class SettingsFrame(ctk.CTkFrame):
             entry.grid(row=i, column=1, pady=6, sticky="w")
             self.entries[label] = entry
 
-        # Invoice & currency row
-        ctk.CTkLabel(frm, text="GST Percent (%):", font=("Segoe UI", 13)).grid(row=4, column=0, sticky="e", padx=12, pady=6)
-        self.gst = ctk.CTkEntry(frm, width=100, font=("Segoe UI", 13), corner_radius=7)
-        self.gst.grid(row=4, column=1, pady=6, sticky="w")
+        # GST Number (for header)
+        ctk.CTkLabel(frm, text="GST Number:", font=("Segoe UI", 13)).grid(row=4, column=0, sticky="e", padx=12, pady=6)
+        self.gst_no = ctk.CTkEntry(frm, width=180, font=("Segoe UI", 13), corner_radius=7)
+        self.gst_no.grid(row=4, column=1, pady=6, sticky="w")
 
-        ctk.CTkLabel(frm, text="Currency Symbol:", font=("Segoe UI", 13)).grid(row=5, column=0, sticky="e", padx=12, pady=6)
+        # GST percent (for calculation)
+        ctk.CTkLabel(frm, text="GST Percent (%):", font=("Segoe UI", 13)).grid(row=5, column=0, sticky="e", padx=12, pady=6)
+        self.gst = ctk.CTkEntry(frm, width=100, font=("Segoe UI", 13), corner_radius=7)
+        self.gst.grid(row=5, column=1, pady=6, sticky="w")
+
+        # Currency symbol
+        ctk.CTkLabel(frm, text="Currency Symbol:", font=("Segoe UI", 13)).grid(row=6, column=0, sticky="e", padx=12, pady=6)
         self.currency = ctk.CTkEntry(frm, width=100, font=("Segoe UI", 13), corner_radius=7)
-        self.currency.grid(row=5, column=1, pady=6, sticky="w")
+        self.currency.grid(row=6, column=1, pady=6, sticky="w")
+
+        # Shop logo picker
+        ctk.CTkLabel(frm, text="Shop Logo:", font=("Segoe UI", 13)).grid(row=7, column=0, sticky="e", padx=12, pady=6)
+        self.logo_var = ctk.StringVar()
+        ctk.CTkEntry(frm, textvariable=self.logo_var, width=220, font=("Segoe UI", 13), state="readonly").grid(row=7, column=1, pady=10, sticky="w")
+        ctk.CTkButton(frm, text="Choose Logo", command=self.select_logo).grid(row=7, column=2, padx=12, pady=10)
 
         # Invoice note
-        ctk.CTkLabel(frm, text="Invoice Note:", font=("Segoe UI", 13)).grid(row=6, column=0, sticky="ne", padx=12, pady=6)
+        ctk.CTkLabel(frm, text="Invoice Note:", font=("Segoe UI", 13)).grid(row=8, column=0, sticky="ne", padx=12, pady=6)
         self.invoice_note = ctk.CTkTextbox(frm, width=370, height=80, font=("Segoe UI", 13))
-        self.invoice_note.grid(row=6, column=1, pady=6, sticky="w")
+        self.invoice_note.grid(row=8, column=1, pady=6, sticky="w")
 
-        # Buttons
+        # Buttons (Save, Reload, Reset, Export, Import)
         btns = ctk.CTkFrame(self, fg_color="transparent")
         btns.pack(padx=24, pady=(10, 16), fill="x")
 
@@ -110,8 +129,13 @@ class SettingsFrame(ctk.CTkFrame):
         self.gst.delete(0, "end")
         self.gst.insert(0, values.get("gst", DEFAULTS["gst"]))
 
+        self.gst_no.delete(0, "end")
+        self.gst_no.insert(0, values.get("gst_no", DEFAULTS["gst_no"]))
+
         self.currency.delete(0, "end")
         self.currency.insert(0, values.get("currency", DEFAULTS["currency"]))
+
+        self.logo_var.set(values.get("logo_path", DEFAULTS["logo_path"]))
 
         self.invoice_note.delete("1.0", "end")
         self.invoice_note.insert("1.0", values.get("invoice_note", DEFAULTS["invoice_note"]))
@@ -125,8 +149,10 @@ class SettingsFrame(ctk.CTkFrame):
             "phone": self.entries["Phone Number:"].get().strip(),
             "email": self.entries["Email:"].get().strip(),
             "gst": self.gst.get().strip(),
+            "gst_no": self.gst_no.get().strip(),
             "currency": self.currency.get().strip(),
-            "invoice_note": self.invoice_note.get("1.0", "end").strip()
+            "invoice_note": self.invoice_note.get("1.0", "end").strip(),
+            "logo_path": self.logo_var.get().strip()
         }
 
         try:
@@ -191,3 +217,11 @@ class SettingsFrame(ctk.CTkFrame):
             if self.app:
                 from utils.helpers import refresh_all
                 refresh_all(self.app)
+
+    def select_logo(self):
+        path = filedialog.askopenfilename(
+            title="Select Logo",
+            filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.bmp")]
+        )
+        if path:
+            self.logo_var.set(path)

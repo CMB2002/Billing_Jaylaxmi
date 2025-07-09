@@ -40,22 +40,43 @@ class CartArea(ctk.CTkFrame):
             ctk.CTkLabel(row, text=label_text, font=("Segoe UI", 13), anchor="w")\
                 .pack(side="left", padx=(2, 12))
 
-            # Show/edit price as integer rupees always
+            # Show/edit price as integer rupees always (but keep float in data)
             if item.get("assigned_price") is not None:
                 if self.edit_mode:
-                    var = ctk.StringVar(value=str(int(item["assigned_price"])))
+                    var = ctk.StringVar(value=str(int(round(item["assigned_price"]))))
                     entry = ctk.CTkEntry(row, textvariable=var, width=64, font=("Segoe UI", 13), corner_radius=7)
                     entry.pack(side="left", padx=(0, 6))
                     self.price_entry_widgets.append(entry)
+
+                    def on_price_change(event=None, idx=idx, var=var):
+                        try:
+                            price = float(var.get())
+                            self.cart[idx]["assigned_price"] = price
+                            self.cart[idx]["total"] = price * self.cart[idx]["qty"]
+                        except Exception:
+                            pass
+                        # Update summary live
+                        if self.parent_frame and hasattr(self.parent_frame, "_update_summary"):
+                            self.parent_frame._update_summary()
+                        # Optionally, refresh row to show new total live
+                        self.refresh(self.cart)
+                    
+                    entry.bind("<KeyRelease>", on_price_change)
+
+                    # Show live total for this row (rounded for user)
+                    live_price = float(var.get()) if var.get() else 0
+                    live_total = int(round(item["qty"] * live_price))
                     ctk.CTkLabel(
                         row,
-                        text=f"= ₹{int(item['qty']) * int(item['assigned_price'])}",
+                        text=f"= ₹{live_total}",
                         font=("Segoe UI", 13)
                     ).pack(side="left", padx=(0, 6))
                 else:
+                    display_price = int(round(item['assigned_price']))
+                    display_total = int(round(item['total']))
                     ctk.CTkLabel(
                         row,
-                        text=f"@ ₹{int(item['assigned_price'])} = ₹{int(item['total'])}",
+                        text=f"@ ₹{display_price} = ₹{display_total}",
                         font=("Segoe UI", 13)
                     ).pack(side="left", padx=(0, 6))
                     self.price_entry_widgets.append(None)
